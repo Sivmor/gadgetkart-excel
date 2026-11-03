@@ -1,0 +1,74 @@
+
+name: GadgetKart Bulk Image Matcher
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "Discover candidates or apply approved images"
+        required: true
+        type: choice
+        options:
+          - discover
+          - apply
+        default: discover
+
+      batch_start:
+        description: "Model group starting position"
+        required: true
+        type: string
+        default: "0"
+
+      batch_count:
+        description: "Number of model groups to search"
+        required: true
+        type: string
+        default: "50"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: gadgetkart-image-sync
+  cancel-in-progress: false
+
+jobs:
+  image-sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout GitHub repository
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          persist-credentials: true
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Install packages
+        run: npm install --no-audit --no-fund
+
+      - name: Search images or apply approvals
+        env:
+          MODE: ${{ inputs.mode }}
+          BATCH_START: ${{ inputs.batch_start }}
+          BATCH_COUNT: ${{ inputs.batch_count }}
+        run: node scripts/image-sync.mjs
+
+      - name: Commit generated updates
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git add -- "Price Data.xlsx" image_candidates.csv
+
+          if ! git diff --cached --quiet; then
+            git commit -m "Update GadgetKart product images"
+            git push origin HEAD:main
+          else
+            echo "No changes to commit"
+          fi
