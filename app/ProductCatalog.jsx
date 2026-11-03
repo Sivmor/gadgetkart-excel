@@ -3,6 +3,8 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
+
+// PRICE FORMAT
 const rupees = (value) =>
   new Intl.NumberFormat("en-IN", {
     style: "currency",
@@ -10,7 +12,9 @@ const rupees = (value) =>
     maximumFractionDigits: 0
   }).format(Number(value || 0));
 
-export default function ProductCatalog({ products }) {
+export default function ProductCatalog({ products = [] }) {
+
+  // SEARCH AND FILTER STATES
   const [search, setSearch] = useState("");
   const [brand, setBrand] = useState("ALL");
   const [category, setCategory] = useState("ALL");
@@ -19,64 +23,107 @@ export default function ProductCatalog({ products }) {
   const [stockOnly, setStockOnly] = useState(false);
   const [visible, setVisible] = useState(24);
 
-  const brands = [...new Set(
-    products.map(p => p.brand)
-  )].sort();
+  // ALL BRANDS FROM EXCEL
+  const brands = useMemo(
+    () =>
+      [...new Set(products.map(p => p.brand).filter(Boolean))]
+        .sort(),
+    [products]
+  );
 
+  // FILTER PRODUCTS
   const filtered = useMemo(() => {
+
     const query = search.trim().toLowerCase();
 
-    return products.filter(p => {
-      const searchText = [
-        p.brand,
-        p.name,
-        p.category,
-        p.specifications?.RAM,
-        p.specifications?.ROM,
-        p.specifications?.Chipset
-      ].filter(Boolean).join(" ").toLowerCase();
+    return products
+      .filter(product => {
 
-      const isMobile = p.category
-        .toUpperCase().includes("MOBILE");
+        const specs = product.specifications || {};
 
-      const isTablet = p.category
-        .toUpperCase().includes("TABLET");
+        const searchText = [
+          product.brand,
+          product.name,
+          product.category,
+          specs.RAM,
+          specs.ROM,
+          specs.Chipset,
+          specs.Processor
+        ]
+          .filter(Boolean)
+          .join(" ")
+          .toLowerCase();
 
-      const price = Number(p.price);
+        const productCategory = String(
+          product.category || ""
+        ).toUpperCase();
 
-      let budgetMatch = true;
+        const isMobile = productCategory.includes("MOBILE");
+        const isTablet = productCategory.includes("TABLET");
 
-      if (budget === "under10") budgetMatch = price < 10000;
-      if (budget === "10to20") {
-        budgetMatch = price >= 10000 && price < 20000;
-      }
-      if (budget === "20to30") {
-        budgetMatch = price >= 20000 && price < 30000;
-      }
-      if (budget === "above30") budgetMatch = price >= 30000;
+        const price = Number(product.price);
 
-      return (
-        searchText.includes(query) &&
-        (brand === "ALL" || p.brand === brand) &&
-        (category === "ALL" ||
-          (category === "MOBILE" && isMobile) ||
-          (category === "TABLET" && isTablet)) &&
-        budgetMatch &&
-        (!stockOnly || p.in_stock)
-      );
-    }).sort((a, b) => {
-      if (sort === "low") {
-        return Number(a.price) - Number(b.price);
-      }
-      if (sort === "high") {
-        return Number(b.price) - Number(a.price);
-      }
-      return (a.brand + a.name).localeCompare(
-        b.brand + b.name
-      );
-    });
-  }, [products, search, brand, category, budget, sort, stockOnly]);
+        // PRICE FILTER
+        let budgetMatch = true;
 
+        if (budget === "under10") {
+          budgetMatch = price < 10000;
+        }
+
+        if (budget === "10to20") {
+          budgetMatch = price >= 10000 && price < 20000;
+        }
+
+        if (budget === "20to30") {
+          budgetMatch = price >= 20000 && price < 30000;
+        }
+
+        if (budget === "above30") {
+          budgetMatch = price >= 30000;
+        }
+
+        return (
+          searchText.includes(query) &&
+          (brand === "ALL" || product.brand === brand) &&
+          (
+            category === "ALL" ||
+            (category === "MOBILE" && isMobile) ||
+            (category === "TABLET" && isTablet)
+          ) &&
+          budgetMatch &&
+          (!stockOnly || product.in_stock)
+        );
+
+      })
+      .sort((a, b) => {
+
+        if (sort === "low") {
+          return Number(a.price) - Number(b.price);
+        }
+
+        if (sort === "high") {
+          return Number(b.price) - Number(a.price);
+        }
+
+        return (
+          String(a.brand || "") + String(a.name || "")
+        ).localeCompare(
+          String(b.brand || "") + String(b.name || "")
+        );
+
+      });
+
+  }, [
+    products,
+    search,
+    brand,
+    category,
+    budget,
+    sort,
+    stockOnly
+  ]);
+
+  // RESET FILTERS
   function resetFilters() {
     setSearch("");
     setBrand("ALL");
@@ -87,8 +134,9 @@ export default function ProductCatalog({ products }) {
     setVisible(24);
   }
 
+  // FILTER INPUT DESIGN
   const fieldStyle = {
-    padding: "12px",
+    padding: "13px",
     border: "1px solid #cbd5e1",
     borderRadius: "8px",
     background: "white",
@@ -99,6 +147,9 @@ export default function ProductCatalog({ products }) {
 
   return (
     <>
+
+      {/* SEARCH AND FILTER SECTION */}
+
       <section
         style={{
           background: "white",
@@ -108,13 +159,21 @@ export default function ProductCatalog({ products }) {
           border: "1px solid #e2e8f0"
         }}
       >
-        <h2 style={{ marginTop: 0, fontSize: "21px" }}>
-          Search & Filter Products
+
+        <h2
+          style={{
+            marginTop: 0,
+            fontSize: "21px"
+          }}
+        >
+          🔍 Search & Filter Products
         </h2>
+
+        {/* SEARCH BAR */}
 
         <input
           type="search"
-          placeholder="Search Samsung, Vivo, iPhone, RAM..."
+          placeholder="Search Samsung, Vivo, Oppo, iPhone, RAM..."
           aria-label="Search products"
           value={search}
           onChange={e => {
@@ -124,17 +183,22 @@ export default function ProductCatalog({ products }) {
           style={{
             ...fieldStyle,
             width: "100%",
-            marginBottom: "12px"
+            marginBottom: "14px"
           }}
         />
+
+        {/* FILTER DROPDOWNS */}
 
         <div
           style={{
             display: "flex",
             flexWrap: "wrap",
-            gap: "10px"
+            gap: "12px"
           }}
         >
+
+          {/* CATEGORY FILTER */}
+
           <select
             aria-label="Category"
             value={category}
@@ -149,6 +213,8 @@ export default function ProductCatalog({ products }) {
             <option value="TABLET">Tablets</option>
           </select>
 
+          {/* BRAND FILTER */}
+
           <select
             aria-label="Brand"
             value={brand}
@@ -159,12 +225,15 @@ export default function ProductCatalog({ products }) {
             }}
           >
             <option value="ALL">All Brands</option>
+
             {brands.map(b => (
               <option key={b} value={b}>
                 {b}
               </option>
             ))}
           </select>
+
+          {/* PRICE FILTER */}
 
           <select
             aria-label="Price range"
@@ -182,8 +251,10 @@ export default function ProductCatalog({ products }) {
             <option value="above30">₹30,000 & Above</option>
           </select>
 
+          {/* SORTING */}
+
           <select
-            aria-label="Sort by"
+            aria-label="Sort products"
             value={sort}
             style={fieldStyle}
             onChange={e => {
@@ -195,7 +266,10 @@ export default function ProductCatalog({ products }) {
             <option value="low">Price: Low to High</option>
             <option value="high">Price: High to Low</option>
           </select>
+
         </div>
+
+        {/* STOCK FILTER AND RESET */}
 
         <div
           style={{
@@ -203,9 +277,10 @@ export default function ProductCatalog({ products }) {
             gap: "16px",
             alignItems: "center",
             flexWrap: "wrap",
-            marginTop: "16px"
+            marginTop: "18px"
           }}
         >
+
           <label>
             <input
               type="checkbox"
@@ -219,170 +294,305 @@ export default function ProductCatalog({ products }) {
           </label>
 
           <button
+            type="button"
             onClick={resetFilters}
             style={{
-              padding: "9px 16px",
+              padding: "10px 18px",
               background: "#2874f0",
               color: "white",
               border: "none",
               borderRadius: "7px",
+              fontWeight: "bold",
               cursor: "pointer"
             }}
           >
             Reset Filters
           </button>
+
         </div>
+
       </section>
+
+      {/* PRODUCT COUNT */}
 
       <div className="section-title">
         <h2>Explore Products</h2>
-        <span>{filtered.length} Products Found</span>
+
+        <span>
+          {filtered.length} Products Found
+        </span>
       </div>
 
+      {/* PRODUCT GRID */}
+
       <section className="product-grid">
+
         {filtered.slice(0, visible).map(product => {
+
           const price = Number(product.price);
           const mrp = Number(product.mrp || 0);
 
-          const discount = mrp > price
-            ? Math.round((1 - price / mrp) * 100)
-            : 0;
+          const discount =
+            mrp > price
+              ? Math.round((1 - price / mrp) * 100)
+              : 0;
 
-          const isTablet = product.category
-            .toUpperCase().includes("TABLET");
+          const isTablet = String(
+            product.category || ""
+          ).toUpperCase().includes("TABLET");
+
+          const specs = product.specifications || {};
 
           return (
-            <article className="product-card" key={product.id}>
+
+            <article
+              className="product-card"
+              key={product.id}
+            >
+
+              {/* PRODUCT IMAGE */}
+
               <div className="product-image">
+
                 {product.image_url ? (
+
                   <img
                     src={product.image_url}
                     alt={`${product.brand} ${product.name}`}
                     loading="lazy"
                   />
+
                 ) : (
+
                   <div className="placeholder-device">
                     {isTablet ? "💻" : "📱"}
                   </div>
+
                 )}
+
               </div>
 
+              {/* PRODUCT INFORMATION */}
+
               <div className="product-info">
+
+                {/* BRAND */}
+
                 <div className="product-brand">
                   {product.brand}
                 </div>
 
-                <h3>{product.brand} {product.name}</h3>
+                {/* PRODUCT NAME */}
+
+                <h3>
+                  {product.brand} {product.name}
+                </h3>
+
+                {/* RAM AND STORAGE */}
 
                 <div className="variant">
-                  {product.specifications?.RAM || "RAM N/A"}
+                  {specs.RAM || "RAM N/A"}
                   {" | "}
-                  {product.specifications?.ROM || "ROM N/A"}
+                  {specs.ROM || "Storage N/A"}
                 </div>
+
+                {/* PRODUCT PRICE */}
 
                 <div className="price-section">
-                  <strong>{rupees(price)}</strong>
+
+                  <strong>
+                    {rupees(price)}
+                  </strong>
+
                   {mrp > price && (
-                    <del>{rupees(mrp)}</del>
+                    <del>
+                      {rupees(mrp)}
+                    </del>
                   )}
+
                 </div>
 
+                {/* DISCOUNT */}
+
                 {discount > 0 && (
-                  <p className="discount">{discount}% OFF</p>
+                  <p className="discount">
+                    {discount}% OFF
+                  </p>
                 )}
 
-                {product.net_price != null &&
-                  Number(product.net_price) < price && (
-                    <p className="cashback">
-                      After Cashback: {rupees(product.net_price)}
-                    </p>
-                  )}
+                {/* STOCK STATUS */}
 
                 <div className="stock-status">
+
                   {product.in_stock ? (
+
                     <span className="in-stock">
                       ● In Stock
                     </span>
+
                   ) : (
+
                     <span className="out-stock">
                       ● Out of Stock
                     </span>
+
                   )}
+
                 </div>
+
+                {/* PRODUCT HIGHLIGHTS */}
 
                 <div className="highlights">
-                  {product.specifications?.Chipset && (
+
+                  {specs.Chipset && (
                     <p>
-                      <b>Chipset:</b>{" "}
-                      {product.specifications.Chipset}
+                      <b>Chipset:</b> {specs.Chipset}
                     </p>
                   )}
 
-                  {product.specifications?.Battery && (
+                  {specs.Battery && (
                     <p>
-                      <b>Battery:</b>{" "}
-                      {product.specifications.Battery}
+                      <b>Battery:</b> {specs.Battery}
                     </p>
                   )}
 
-                  {product.specifications?.["Rear Camera"] && (
+                  {specs["Rear Camera"] && (
                     <p>
-                      <b>Camera:</b>{" "}
-                      {product.specifications["Rear Camera"]}
+                      <b>Camera:</b> {specs["Rear Camera"]}
                     </p>
                   )}
+
                 </div>
 
+                {/* FULL SPECIFICATIONS */}
+
                 <details className="spec-details">
-                  <summary>View Full Specifications</summary>
+
+                  <summary>
+                    View Full Specifications
+                  </summary>
 
                   <div className="spec-list">
+
                     {product.colors && (
                       <p>
                         <b>Colors:</b> {product.colors}
                       </p>
                     )}
 
-                    {Object.entries(
-                      product.specifications || {}
-                    ).filter(([, value]) => value)
+                    {Object.entries(specs)
+                      .filter(([, value]) => value)
                       .map(([key, value]) => (
+
                         <p key={key}>
-                          <b>{key}:</b> {value}
+                          <b>{key}:</b> {String(value)}
                         </p>
+
                       ))}
+
                   </div>
+
                 </details>
+
+                {/* VIEW DETAILS BUTTON */}
+
+                <Link
+                  href={`/product/${product.id}`}
+                  style={{
+                    display: "block",
+                    width: "100%",
+                    textAlign: "center",
+                    background: "#2874f0",
+                    color: "#ffffff",
+                    padding: "14px",
+                    marginTop: "18px",
+                    borderRadius: "8px",
+                    fontSize: "14px",
+                    fontWeight: "bold",
+                    textDecoration: "none"
+                  }}
+                >
+                  View Details →
+                </Link>
+
               </div>
+
             </article>
+
           );
+
         })}
+
       </section>
 
+      {/* EMPTY SEARCH RESULTS */}
+
       {filtered.length === 0 && (
-        <div style={{ textAlign: "center", padding: "40px" }}>
+
+        <div
+          style={{
+            textAlign: "center",
+            padding: "45px",
+            background: "white",
+            borderRadius: "12px"
+          }}
+        >
           <h3>No Products Found</h3>
-          <p>Please change your search or filters.</p>
+
+          <p>
+            Try changing your search or filters.
+          </p>
+
+          <button
+            type="button"
+            onClick={resetFilters}
+            style={{
+              padding: "12px 20px",
+              background: "#2874f0",
+              color: "white",
+              border: "none",
+              borderRadius: "8px",
+              cursor: "pointer"
+            }}
+          >
+            Clear All Filters
+          </button>
+
         </div>
+
       )}
 
+      {/* LOAD MORE PRODUCTS */}
+
       {visible < filtered.length && (
-        <div style={{ textAlign: "center", marginTop: "30px" }}>
+
+        <div
+          style={{
+            textAlign: "center",
+            marginTop: "30px"
+          }}
+        >
+
           <button
+            type="button"
             onClick={() => setVisible(v => v + 24)}
             style={{
               background: "#2874f0",
               color: "white",
-              padding: "13px 28px",
+              padding: "14px 28px",
               borderRadius: "8px",
               border: "none",
+              fontWeight: "bold",
               cursor: "pointer"
             }}
           >
             Load More Products
           </button>
+
         </div>
+
       )}
+
     </>
   );
 }
