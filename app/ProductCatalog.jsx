@@ -2,7 +2,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-
+import Link from "next/link";
 const rupees = (value) =>
   new Intl.NumberFormat("en-IN", {
     style: "currency",
